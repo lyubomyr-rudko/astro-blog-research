@@ -6,6 +6,7 @@ const baseUrl = import.meta.env.BASE_URL.endsWith("/")
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
 const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
+const slidesSearchJson = JSON.stringify(slidesSearch).replace(/</g, "\\u003c");
 ---
 
 <BaseLayout
@@ -95,6 +96,35 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
           >
             <li class="slides-builder-empty">Ще немає вибраних пісень.</li>
           </ol>
+          <div
+            class="slides-builder-selected-actions"
+            data-slide-selected-actions
+            hidden
+          >
+            <a
+              class="slides-builder-action-link"
+              data-slide-builder-share-link
+              href={withBase("/slides/")}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Відкрити слайди пісень окремо
+            </a>
+            <button
+              class="slides-builder-action-button"
+              data-slide-builder-copy-link
+              type="button"
+            >
+              Копіювати посилання
+            </button>
+            <a
+              class="slides-builder-action-link"
+              data-slide-builder-pptx-link
+              href={withBase("/slides/")}
+            >
+              Експортувати слайди в PowerPoint
+            </a>
+          </div>
         </section>
       </div>
 
@@ -114,25 +144,41 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
             Додайте пісні, щоб побачити слайди.
           </p>
         </div>
-        <div class="slides-builder-share">
-          <a
-            data-slide-builder-share-link
-            href={withBase("/slides/")}
-            target="_blank"
-            rel="noopener noreferrer"
-            hidden></a>
-        </div>
       </section>
     </section>
   </div>
 
-  <script define:vars={{ slidesSearch, slidesPath: withBase("/slides/") }}>
+  <script
+    type="application/json"
+    data-slides-search
+    set:html={slidesSearchJson}
+  ></script>
+  <div data-slides-builder-config data-slides-path={withBase("/slides/")} hidden>
+  </div>
+
+  <script>
+    import pptxgen from "pptxgenjs";
+
+    const slidesSearchElement = document.querySelector("[data-slides-search]");
+    const slidesConfig = document.querySelector("[data-slides-builder-config]");
+    const slidesSearch = JSON.parse(slidesSearchElement?.textContent ?? "{}");
+    const slidesPath =
+      slidesConfig instanceof HTMLElement
+        ? (slidesConfig.dataset.slidesPath ?? "/slides/")
+        : "/slides/";
     const searchInput = document.querySelector("[data-slide-search-input]");
     const serviceList = document.querySelector("[data-slide-service-list]");
     const searchResults = document.querySelector("[data-slide-search-results]");
     const selectedList = document.querySelector("[data-slide-selected-list]");
     const previewGrid = document.querySelector("[data-slide-builder-preview]");
+    const selectedActions = document.querySelector(
+      "[data-slide-selected-actions]",
+    );
     const shareLink = document.querySelector("[data-slide-builder-share-link]");
+    const copyLinkButton = document.querySelector(
+      "[data-slide-builder-copy-link]",
+    );
+    const pptxLink = document.querySelector("[data-slide-builder-pptx-link]");
     const builderForm = document.querySelector(".slides-builder-form");
     const chosenSongs = [];
     let draggedSelectedIndex = null;
@@ -170,6 +216,23 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
         .replace(/__([^_]+)__/g, "<strong>$1</strong>")
         .replace(/_([^_]+)_/g, "<em>$1</em>")
         .replace(/~~([^~]+)~~/g, "<del>$1</del>");
+
+    const writeToClipboard = async (text) => {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.top = "-1000px";
+      document.body.append(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    };
 
     const renderSlideMarkdown = (value) => {
       const lines = value.trim().split(/\r?\n/);
@@ -214,6 +277,161 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
 
       flushList();
       return html.join("");
+    };
+
+    const parseInlineMarkdown = (value) => {
+      const runs = [];
+      const pattern = /(\*\*\*[^*]+\*\*\*|___[^_]+___|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|~~[^~]+~~|`[^`]+`)/g;
+      let lastIndex = 0;
+
+      const pushText = (text, styles = {}) => {
+        if (!text) return;
+        runs.push({ text, ...styles });
+      };
+
+      for (const match of value.matchAll(pattern)) {
+        const token = match[0];
+        const index = match.index ?? 0;
+
+        pushText(value.slice(lastIndex, index));
+
+        if (token.startsWith("***") || token.startsWith("___")) {
+          pushText(token.slice(3, -3), { bold: true, italic: true });
+        } else if (token.startsWith("**") || token.startsWith("__")) {
+          pushText(token.slice(2, -2), { bold: true });
+        } else if (token.startsWith("*") || token.startsWith("_")) {
+          pushText(token.slice(1, -1), { italic: true });
+        } else if (token.startsWith("~~")) {
+          pushText(token.slice(2, -2), { strike: true });
+        } else if (token.startsWith("`")) {
+          pushText(token.slice(1, -1), { code: true });
+        }
+
+        lastIndex = index + token.length;
+      }
+
+      pushText(value.slice(lastIndex));
+      return runs.length ? runs : [{ text: value }];
+    };
+
+    const parseSlideMarkdown = (value) =>
+      value
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const heading = /^(#{1,6})\s+(.+)$/.exec(line);
+          if (heading) {
+            return {
+              type: "heading",
+              level: Math.min(heading[1].length, 3),
+              runs: parseInlineMarkdown(heading[2]),
+            };
+          }
+
+          const listItem = /^[-*+]\s+(.+)$/.exec(line);
+          if (listItem) {
+            return { type: "listItem", runs: parseInlineMarkdown(listItem[1]) };
+          }
+
+          if (line.startsWith("> ")) {
+            return { type: "quote", runs: parseInlineMarkdown(line.slice(2)) };
+          }
+
+          return { type: "paragraph", runs: parseInlineMarkdown(line) };
+        });
+
+    const slugifyFilename = (value) =>
+      value
+        .toLocaleLowerCase("uk-UA")
+        .replace(/[^\p{L}\p{N}]+/gu, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "slides";
+
+    const downloadPowerPoint = async (slides, title, filename) => {
+      const pptx = new pptxgen();
+
+      pptx.layout = "LAYOUT_WIDE";
+      pptx.author = "wesley.org.ua";
+      pptx.company = "wesley.org.ua";
+      pptx.subject = "Church slides";
+      pptx.title = title;
+      pptx.lang = "uk-UA";
+      pptx.theme = {
+        headFontFace: "Arial",
+        bodyFontFace: "Arial",
+        lang: "uk-UA",
+      };
+
+      slides.forEach((slideContent) => {
+        const slide = pptx.addSlide();
+        const hasTitle = Boolean(slideContent.title);
+
+        slide.background = { color: "090A0D" };
+
+        if (slideContent.title) {
+          slide.addText(slideContent.title, {
+            x: 0.35,
+            y: 0.25,
+            w: 12.63,
+            h: 1.05,
+            margin: 0,
+            fontFace: "Arial",
+            fontSize: 32,
+            bold: true,
+            color: "FFFDF9",
+            align: "center",
+            valign: "mid",
+          });
+        }
+
+        const textBlocks = parseSlideMarkdown(slideContent.text);
+        const richText = textBlocks.flatMap((block, blockIndex) => {
+          const prefix = block.type === "listItem" ? "• " : "";
+          const suffix = blockIndex === textBlocks.length - 1 ? "" : "\n";
+          const blockBold = block.type === "heading";
+          const blockItalic = block.type === "quote";
+          const blockSize =
+            block.type === "heading" && block.level === 1
+              ? 62
+              : block.type === "heading"
+                ? 56
+                : 54;
+
+          return block.runs.map((run, runIndex) => ({
+            text: `${runIndex === 0 ? prefix : ""}${run.text}${
+              runIndex === block.runs.length - 1 ? suffix : ""
+            }`,
+            options: {
+              bold: blockBold || run.bold || !run.italic,
+              italic: blockItalic || run.italic,
+              strike: run.strike,
+              fontFace: run.code ? "Courier New" : "Arial",
+              fontSize: run.code ? Math.max(30, blockSize - 8) : blockSize,
+              color: "FFFDF9",
+              breakLine: false,
+            },
+          }));
+        });
+
+        slide.addText(richText.length ? richText : slideContent.text, {
+          x: 0.45,
+          y: hasTitle ? 1.35 : 0.35,
+          w: 12.43,
+          h: hasTitle ? 5.75 : 6.8,
+          margin: 0,
+          fontFace: "Arial",
+          fontSize: 54,
+          bold: true,
+          color: "FFFDF9",
+          align: "center",
+          valign: "mid",
+          fit: "shrink",
+        });
+      });
+
+      await pptx.writeFile({ fileName: filename });
     };
 
     const songs = Object.values(slidesSearch.songs).sort((left, right) => {
@@ -542,20 +760,46 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     };
 
     const renderShareLink = () => {
-      if (!shareLink) return;
+      if (!selectedActions || !shareLink || !copyLinkButton || !pptxLink)
+        return;
 
       if (!chosenSongs.length) {
+        selectedActions.hidden = true;
         shareLink.hidden = true;
         shareLink.removeAttribute("href");
-        shareLink.textContent = "";
+        copyLinkButton.hidden = true;
+        pptxLink.hidden = true;
+        pptxLink.removeAttribute("href");
         return;
       }
 
       const group = chosenSongs.map((song) => song.key).join(",");
       const href = `${slidesPath}#group=${group}`;
+      selectedActions.hidden = false;
       shareLink.hidden = false;
       shareLink.href = href;
-      shareLink.textContent = "Відкрити слайди пісень окремо";
+      copyLinkButton.hidden = false;
+      pptxLink.hidden = false;
+      pptxLink.href = href;
+    };
+
+    const getSelectedPowerPointSlides = () => {
+      const slides = [];
+
+      chosenSongs.forEach((song, songIndex) => {
+        (song.slides ?? []).forEach((slide, slideIndex) => {
+          slides.push({
+            text: slide.text,
+            title: slideIndex === 0 ? song.title : "",
+          });
+        });
+
+        if (songIndex !== chosenSongs.length - 1) {
+          slides.push({ text: "", title: "" });
+        }
+      });
+
+      return slides;
     };
 
     const hydrateChosenSongsFromUrl = () => {
@@ -570,6 +814,45 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     builderForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       renderSearchResults();
+    });
+
+    copyLinkButton?.addEventListener("click", async () => {
+      if (!shareLink?.href) return;
+
+      const buttonText = copyLinkButton.textContent;
+      await writeToClipboard(shareLink.href);
+      copyLinkButton.textContent = "Скопійовано";
+      copyLinkButton.classList.add("is-copied");
+
+      window.setTimeout(() => {
+        copyLinkButton.textContent = buttonText;
+        copyLinkButton.classList.remove("is-copied");
+      }, 1400);
+    });
+
+    pptxLink?.addEventListener("click", async (event) => {
+      event.preventDefault();
+
+      const slides = getSelectedPowerPointSlides();
+      if (!slides.length) return;
+
+      const linkText = pptxLink.textContent;
+      const group = chosenSongs.map((song) => song.key).join("-");
+      const title = `Слайди ${chosenSongs
+        .map((song) => song.displayTitle || song.title)
+        .join(", ")}`;
+
+      pptxLink.textContent = "Експорт...";
+      await downloadPowerPoint(
+        slides,
+        title,
+        `slides-${slugifyFilename(group)}.pptx`,
+      );
+      pptxLink.textContent = "Завантажено";
+
+      window.setTimeout(() => {
+        pptxLink.textContent = linkText;
+      }, 1400);
     });
 
     searchInput?.addEventListener("input", renderSearchResults);
