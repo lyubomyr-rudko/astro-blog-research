@@ -144,6 +144,16 @@ type BlogPostEntry = CollectionEntry<"blog">;
             )
           }
         </div>
+
+        <h4 class="church-address home-youtube-link">
+          Приєднайтеся до нашої групи в{" "}
+          <a
+            href="https://youtu.be/dotQFbne868?si=7XQK-TYYMqYSW2iJ"
+            class="archive-inline-link"
+          >
+            YouTube
+          </a>
+        </h4>
       </div>
 
       <div class="home-hero-visual">
@@ -177,12 +187,7 @@ type BlogPostEntry = CollectionEntry<"blog">;
             <p class="archive-eyebrow">Проповідь дня</p>
             <h2>Проповідь Джона Веслі на сьогодні</h2>
             <p class="archive-summary">
-              Чергова проповідь з циклу щоденних читань, підбірки з 140
-              проповідей, які Джон Веслі складав для своїх послідовників. Кожна
-              проповідь поєднує глибоке богослов'я з практичними порадами для
-              християнського життя, і разом вони створюють потужний ресурс для
-              духовного зростання та натхнення. Читайте щодня та відкривайте для
-              себе багатство духовної мудрості Джона Веслі.
+              Проповідь з підбірки з 140 класичних проповідей Джона Веслі.
             </p>
           </div>
 
@@ -224,10 +229,32 @@ type BlogPostEntry = CollectionEntry<"blog">;
         <section class="archive-card" data-reveal>
           <div class="archive-header">
             <p class="archive-eyebrow">Церква у Львові</p>
-            <h2>Останні записи зі сторінки церкви</h2>
+            <h2>Свіжі записи богослужінь</h2>
+
+            <p class="archive-summary">
+              <hr />
+              <h4 class="church-address">
+                Завітайте до нас у неділю{" "}
+                <>
+                  <strong> 11:00</strong>
+                  <br />
+                </>{" "}
+                м. Львів, площа Григоренка 5
+              </h4>
+              <hr />
+              <h4 class="church-address">
+                Приєднайдеся до нашої групи в
+                <a
+                  href="https://youtu.be/dotQFbne868?si=7XQK-TYYMqYSW2iJ"
+                  class="archive-inline-link"
+                >
+                  YouTube
+                </a>
+              </h4>
+            </p>
             <p class="archive-summary">
               <a class="archive-inline-link" href={withBase("/church/")}>
-                Усі записи церкви
+                Архів богослужінь церкви
               </a>
             </p>
           </div>
@@ -492,6 +519,10 @@ type BlogPostEntry = CollectionEntry<"blog">;
     .home-effects .post-link {
       position: relative;
       z-index: 1;
+    }
+
+    .home-effects .home-youtube-link {
+      margin-top: 3rem;
     }
 
     .home-effects .daily-sermon-excerpt p {
