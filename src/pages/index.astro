@@ -10,6 +10,101 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
 
 const blogEntries = await getCollection("blog");
 
+const cleanMarkdownParagraph = (paragraph: string) =>
+  paragraph
+    .replace(/\\([\\`*_[\]{}()#+\-.!>])/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^[\s>]+/gm, "")
+    .replace(/[*_`~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getOpeningParagraphs = (
+  body: string,
+  {
+    fallback,
+    title,
+    date,
+  }: { fallback?: string; title?: string; date?: string } = {},
+) => {
+  const cleanTitle = title ? cleanMarkdownParagraph(title) : "";
+  const paragraphs = body
+    .replace(/<img[\s\S]*?\/>/g, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/g, "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(
+      (paragraph) =>
+        paragraph &&
+        !paragraph.startsWith("#") &&
+        !paragraph.startsWith("---") &&
+        !paragraph.startsWith("<"),
+    )
+    .map(cleanMarkdownParagraph)
+    .filter((paragraph) => {
+      const normalized = paragraph.toLocaleLowerCase("uk-UA");
+      return (
+        paragraph.length >= 20 &&
+        paragraph !== date &&
+        paragraph !== cleanTitle &&
+        !normalized.startsWith("проповіді джона веслі")
+      );
+    })
+    .slice(0, 2);
+
+  if (paragraphs.length > 0) return paragraphs;
+  return fallback ? [fallback] : [];
+};
+
+const getDateKey = (date = new Date()) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+
+const getDateHash = (dateKey: string) =>
+  [...dateKey].reduce(
+    (hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0,
+    0,
+  );
+
+const getDailySermon = <
+  Sermon extends {
+    title: string;
+    date: string;
+    url: string;
+    excerpt: string[];
+  },
+>(
+  sermons: Sermon[],
+  dateKey: string,
+) => sermons[getDateHash(dateKey) % sermons.length];
+
+const sermonSummaries = blogEntries
+  .filter((post) => post.id.startsWith("sermons/"))
+  .sort((a, b) => a.id.localeCompare(b.id))
+  .map((post) => ({
+    title: post.data.title,
+    date: post.data.pubDate ?? "",
+    url: withBase(`/${post.id}/`),
+    excerpt: getOpeningParagraphs(post.body, {
+      fallback: post.data.description,
+      title: post.data.title,
+      date: post.data.pubDate,
+    }),
+  }));
+const todayDateKey = getDateKey();
+const dailySermon = sermonSummaries.length
+  ? getDailySermon(sermonSummaries, todayDateKey)
+  : undefined;
+const sermonSummariesJson = JSON.stringify(sermonSummaries).replace(
+  /</g,
+  "\\u003c",
+);
+
 const posts = blogEntries
   .filter(
     (post) =>
@@ -38,7 +133,9 @@ type BlogPostEntry = CollectionEntry<"blog">;
         </p>
 
         <div class="home-actions">
-          <a class="button-primary" href="#materials">Читати матеріали</a>
+          <a class="button-primary" href={dailySermon?.url ?? "#materials"}>
+            Читати проповіді Джона Веслея
+          </a>
           {
             posts[0] && (
               <a class="button-secondary" href={withBase(`/${posts[0].id}/`)}>
@@ -47,6 +144,16 @@ type BlogPostEntry = CollectionEntry<"blog">;
             )
           }
         </div>
+
+        <h4 class="church-address home-youtube-link">
+          Приєднайтеся до нашої групи в{" "}
+          <a
+            href="https://youtu.be/dotQFbne868?si=7XQK-TYYMqYSW2iJ"
+            class="archive-inline-link"
+          >
+            YouTube
+          </a>
+        </h4>
       </div>
 
       <div class="home-hero-visual">
@@ -70,14 +177,84 @@ type BlogPostEntry = CollectionEntry<"blog">;
     </section>
 
     {
+      dailySermon && (
+        <section
+          class="archive-card daily-sermon-card"
+          data-daily-sermon
+          data-reveal
+        >
+          <div class="archive-header">
+            <p class="archive-eyebrow">Проповідь дня</p>
+            <h2>Проповідь Джона Веслі на сьогодні</h2>
+            <p class="archive-summary">
+              Проповідь з підбірки з 140 класичних проповідей Джона Веслі.
+            </p>
+          </div>
+
+          <ul class="post-list">
+            <li class="post-item" data-reveal>
+              <a
+                class="post-link"
+                data-daily-sermon-link
+                href={dailySermon.url}
+              >
+                {dailySermon.date && (
+                  <span class="post-date" data-daily-sermon-date>
+                    {dailySermon.date}
+                  </span>
+                )}
+                <span class="post-title" data-daily-sermon-title>
+                  {dailySermon.title}
+                </span>
+                <div
+                  class="post-description daily-sermon-excerpt"
+                  data-daily-sermon-excerpt
+                >
+                  {dailySermon.excerpt.map((paragraph) => (
+                    <p>{paragraph}</p>
+                  ))}
+                </div>
+                <span class="button-secondary daily-sermon-button">
+                  Читати далі
+                </span>
+              </a>
+            </li>
+          </ul>
+        </section>
+      )
+    }
+
+    {
       churchPosts.length > 0 && (
         <section class="archive-card" data-reveal>
           <div class="archive-header">
             <p class="archive-eyebrow">Церква у Львові</p>
-            <h2>Останні записи зі сторінки церкви</h2>
+            <h2>Свіжі записи богослужінь</h2>
+
+            <p class="archive-summary">
+              <hr />
+              <h4 class="church-address">
+                Завітайте до нас у неділю{" "}
+                <>
+                  <strong> 11:00</strong>
+                  <br />
+                </>{" "}
+                м. Львів, площа Григоренка 5
+              </h4>
+              <hr />
+              <h4 class="church-address">
+                Приєднайдеся до нашої групи в
+                <a
+                  href="https://youtu.be/dotQFbne868?si=7XQK-TYYMqYSW2iJ"
+                  class="archive-inline-link"
+                >
+                  YouTube
+                </a>
+              </h4>
+            </p>
             <p class="archive-summary">
               <a class="archive-inline-link" href={withBase("/church/")}>
-                Усі записи церкви
+                Архів богослужінь церкви
               </a>
             </p>
           </div>
@@ -138,6 +315,12 @@ type BlogPostEntry = CollectionEntry<"blog">;
     </section>
   </div>
 
+  <script
+    type="application/json"
+    data-daily-sermons-source
+    set:html={sermonSummariesJson}
+  />
+
   <style>
     .home-effects {
       --home-scroll-progress: 0;
@@ -166,7 +349,11 @@ type BlogPostEntry = CollectionEntry<"blog">;
           transparent 46px
         ),
         linear-gradient(115deg, rgba(178, 31, 45, 0.08), transparent 36%),
-        linear-gradient(180deg, rgba(255, 253, 249, 0), rgba(247, 241, 232, 0.5));
+        linear-gradient(
+          180deg,
+          rgba(255, 253, 249, 0),
+          rgba(247, 241, 232, 0.5)
+        );
       opacity: 0.62;
       pointer-events: none;
       transform: translate3d(0, var(--home-bg-y), 0);
@@ -197,7 +384,11 @@ type BlogPostEntry = CollectionEntry<"blog">;
           transparent 1px,
           transparent 28px
         ),
-        linear-gradient(90deg, rgba(247, 241, 232, 0.52), rgba(255, 253, 249, 0));
+        linear-gradient(
+          90deg,
+          rgba(247, 241, 232, 0.52),
+          rgba(255, 253, 249, 0)
+        );
       opacity: 0.42;
       pointer-events: none;
       transform: translate3d(0, var(--home-hero-bg-y), 0);
@@ -330,6 +521,22 @@ type BlogPostEntry = CollectionEntry<"blog">;
       z-index: 1;
     }
 
+    .home-effects .home-youtube-link {
+      margin-top: 3rem;
+    }
+
+    .home-effects .daily-sermon-excerpt p {
+      margin: 0;
+    }
+
+    .home-effects .daily-sermon-excerpt p + p {
+      margin-top: 0.65rem;
+    }
+
+    .home-effects .daily-sermon-button {
+      margin-top: 1rem;
+    }
+
     @media (max-width: 720px) {
       .home-effects::before {
         inset: -1.2rem -0.6rem -0.6rem;
@@ -367,6 +574,62 @@ type BlogPostEntry = CollectionEntry<"blog">;
   </style>
 
   <script>
+    const dailySermonsSource = document.querySelector(
+      "[data-daily-sermons-source]",
+    );
+    const dailySermonCard = document.querySelector("[data-daily-sermon]");
+
+    if (dailySermonsSource && dailySermonCard instanceof HTMLElement) {
+      const getDailyDateKey = (date = new Date()) =>
+        [
+          date.getFullYear(),
+          String(date.getMonth() + 1).padStart(2, "0"),
+          String(date.getDate()).padStart(2, "0"),
+        ].join("-");
+      const getDailyDateHash = (dateKey) =>
+        [...dateKey].reduce(
+          (hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0,
+          0,
+        );
+
+      try {
+        const sermons = JSON.parse(dailySermonsSource.textContent || "[]");
+        const sermon = sermons.length
+          ? sermons[getDailyDateHash(getDailyDateKey()) % sermons.length]
+          : null;
+
+        if (sermon) {
+          const link = dailySermonCard.querySelector(
+            "[data-daily-sermon-link]",
+          );
+          const date = dailySermonCard.querySelector(
+            "[data-daily-sermon-date]",
+          );
+          const title = dailySermonCard.querySelector(
+            "[data-daily-sermon-title]",
+          );
+          const excerpt = dailySermonCard.querySelector(
+            "[data-daily-sermon-excerpt]",
+          );
+
+          if (link instanceof HTMLAnchorElement) link.href = sermon.url;
+          if (date) date.textContent = sermon.date;
+          if (title) title.textContent = sermon.title;
+          if (excerpt) {
+            excerpt.replaceChildren(
+              ...sermon.excerpt.map((paragraph) => {
+                const element = document.createElement("p");
+                element.textContent = paragraph;
+                return element;
+              }),
+            );
+          }
+        }
+      } catch {
+        dailySermonCard.removeAttribute("data-daily-sermon-live");
+      }
+    }
+
     const homeRoot = document.querySelector("[data-home-scroll]");
 
     if (homeRoot instanceof HTMLElement) {
@@ -419,7 +682,10 @@ type BlogPostEntry = CollectionEntry<"blog">;
             "--home-scroll-progress",
             progress.toFixed(4),
           );
-          homeRoot.style.setProperty("--home-bg-y", `${(progress * 42).toFixed(1)}px`);
+          homeRoot.style.setProperty(
+            "--home-bg-y",
+            `${(progress * 42).toFixed(1)}px`,
+          );
           homeRoot.style.setProperty(
             "--home-hero-bg-y",
             `${(progress * -26).toFixed(1)}px`,
@@ -451,7 +717,9 @@ type BlogPostEntry = CollectionEntry<"blog">;
         };
 
         updateScrollEffects();
-        window.addEventListener("scroll", queueScrollEffects, { passive: true });
+        window.addEventListener("scroll", queueScrollEffects, {
+          passive: true,
+        });
         window.addEventListener("resize", queueScrollEffects);
       }
     }
