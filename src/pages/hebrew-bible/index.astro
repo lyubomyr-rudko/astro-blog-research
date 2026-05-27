@@ -1,0 +1,187 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+import { hebrewBibleBooks } from "../../data/hebrew.js";
+
+const baseUrl = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
+const totalChapters = hebrewBibleBooks.reduce(
+  (sum, book) => sum + book.chapterCount,
+  0,
+);
+---
+
+<BaseLayout
+  title="Єврейська Біблія"
+  description="Єврейський текст Біблії: вибір книги та розділу для читання."
+>
+  <div class="resource-shell bible-shell">
+    <section class="resource-hero">
+      <p class="resource-kicker">Єврейський текст Старого Завіту</p>
+      <h1 class="resource-title">Єврейська Біблія</h1>
+      <p class="resource-summary">Оберіть книгу і розділ.</p>
+    </section>
+
+    <div class="bible-picker-sentinel" data-bible-picker-sentinel></div>
+    <form class="bible-picker bible-index-picker bible-sticky-picker" data-bible-picker>
+      <label class="bible-picker-field">
+        <span>Книга</span>
+        <select name="book" aria-label="Книга">
+          {
+            hebrewBibleBooks.map((book) => (
+              <option
+                value={book.slug}
+                data-chapters={book.chapters.join(",")}
+              >
+                {book.title}
+              </option>
+            ))
+          }
+        </select>
+      </label>
+
+      <label class="bible-picker-field">
+        <span>Розділ</span>
+        <select name="chapter" aria-label="Розділ"></select>
+      </label>
+
+      <button class="button-primary bible-picker-button" type="submit">
+        Читати
+      </button>
+    </form>
+
+    <section class="resource-panel">
+      <div class="resource-panel-header">
+        <p class="archive-eyebrow">Повний перелік</p>
+        <h2>Книги Єврейської Біблії</h2>
+        <p class="archive-summary">
+          У каталозі зараз: <span class="count">{totalChapters}</span> розділів
+        </p>
+      </div>
+
+      <div class="bible-book-grid">
+        {
+          hebrewBibleBooks.map((book) => (
+            <article class="bible-book-card" data-book-slug={book.slug}>
+              <h3>
+                <a href={withBase(`/hebrew-bible/${book.slug}/1/`)}>
+                  {book.title}
+                </a>
+              </h3>
+              <ol aria-label={`Розділи книги ${book.title}`}>
+                {book.chapters.map((chapter) => (
+                  <li>
+                    <a href={withBase(`/hebrew-bible/${book.slug}/${chapter}/`)}>
+                      {chapter}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+  </div>
+
+  <script define:vars={{ baseUrl }}>
+    const form = document.querySelector("[data-bible-picker]");
+    const bookSelect = form?.elements.book;
+    const chapterSelect = form?.elements.chapter;
+    const pickerSentinel = document.querySelector("[data-bible-picker-sentinel]");
+    const siteHeader = document.querySelector(".site-header");
+
+    const updateStickyOffset = () => {
+      const headerHeight = siteHeader?.getBoundingClientRect().height ?? 0;
+      document.documentElement.style.setProperty(
+        "--bible-picker-sticky-top",
+        `${headerHeight + 12}px`,
+      );
+    };
+
+    const updatePickerStickyState = () => {
+      if (!form || !pickerSentinel) {
+        return;
+      }
+
+      const stickyTop =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--bible-picker-sticky-top",
+          ),
+        ) || 0;
+      const isStuck = pickerSentinel.getBoundingClientRect().top <= stickyTop;
+
+      form.classList.toggle("is-stuck", isStuck);
+    };
+
+    const setSelectedBookCard = () => {
+      document
+        .querySelectorAll(".bible-book-card.is-selected")
+        .forEach((bookCard) => bookCard.classList.remove("is-selected"));
+
+      document
+        .querySelector(`[data-book-slug="${bookSelect.value}"]`)
+        ?.classList.add("is-selected");
+    };
+
+    const scrollSelectedBookIntoView = () => {
+      const selectedBookCard = document.querySelector(
+        `[data-book-slug="${bookSelect.value}"]`,
+      );
+
+      selectedBookCard?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    };
+
+    const renderChapters = () => {
+      const selectedBook = bookSelect.selectedOptions[0];
+      const chapters = selectedBook.dataset.chapters.split(",");
+
+      chapterSelect.replaceChildren(
+        ...chapters.map((chapter) => {
+          const option = document.createElement("option");
+          option.value = chapter;
+          option.textContent = chapter;
+          return option;
+        }),
+      );
+    };
+
+    const handleBookChange = () => {
+      renderChapters();
+      setSelectedBookCard();
+      scrollSelectedBookIntoView();
+    };
+
+    const navigateToSelectedChapter = () => {
+      window.location.href = `${baseUrl}hebrew-bible/${bookSelect.value}/${chapterSelect.value}/`;
+    };
+
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      navigateToSelectedChapter();
+    });
+
+    bookSelect?.addEventListener("change", handleBookChange);
+    chapterSelect?.addEventListener("change", navigateToSelectedChapter);
+    window.addEventListener("scroll", updatePickerStickyState, { passive: true });
+    window.addEventListener("resize", () => {
+      updateStickyOffset();
+      updatePickerStickyState();
+    });
+    window.addEventListener("load", () => {
+      updateStickyOffset();
+      updatePickerStickyState();
+    });
+
+    renderChapters();
+    setSelectedBookCard();
+    updateStickyOffset();
+    updatePickerStickyState();
+  </script>
+</BaseLayout>

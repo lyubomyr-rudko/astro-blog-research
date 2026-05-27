@@ -1,11 +1,13 @@
 import { getCollection } from "astro:content";
 import { bibleChapters } from "../data/bible.js";
+import { hebrewBibleChapters } from "../data/hebrew.js";
 
 const staticPages = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
   { path: "/propovidi/", priority: "0.9", changefreq: "weekly" },
   { path: "/propovidi-po-datah/", priority: "0.8", changefreq: "monthly" },
   { path: "/bible/", priority: "0.9", changefreq: "monthly" },
+  { path: "/hebrew-bible/", priority: "0.6", changefreq: "monthly" },
   { path: "/church/", priority: "0.8", changefreq: "weekly" },
   { path: "/slides/", priority: "0.5", changefreq: "monthly" },
   { path: "/slides/builder/", priority: "0.4", changefreq: "monthly" },
@@ -71,6 +73,12 @@ export async function GET({ site }: { site: URL }) {
       lastmod: today,
       changefreq: "yearly",
       priority: "0.6",
+    })),
+    ...hebrewBibleChapters.map((chapter) => ({
+      path: chapter.path,
+      lastmod: today,
+      changefreq: "yearly",
+      priority: "0.5",
     })),
   ];
 

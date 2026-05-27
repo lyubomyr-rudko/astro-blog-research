@@ -1051,6 +1051,27 @@ img {
   box-shadow: 0 0 0 0.45rem rgba(178, 31, 45, 0.08);
 }
 
+.hebrew-chapter-text {
+  font-family: "SBL Hebrew", "Ezra SIL", "Times New Roman", serif;
+  font-size: clamp(1.35rem, 2.7vw, 1.75rem);
+  line-height: 1.9;
+}
+
+.hebrew-verse {
+  grid-template-columns: minmax(0, 1fr) 2.25rem;
+}
+
+.hebrew-verse sup {
+  grid-column: 2;
+  text-align: left;
+}
+
+.hebrew-verse span {
+  grid-column: 1;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
 .bible-pagination {
   margin-top: 2rem;
 }
