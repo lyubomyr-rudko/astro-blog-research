@@ -40,21 +40,28 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     <header class="post-header bible-reader-header">
       <p class="post-eyebrow">Єврейська Біблія</p>
       <h1>{chapter.title} {chapter.chapter}</h1>
-      <button
-        class="slide-action-button bible-chapter-copy-button"
-        type="button"
-        data-bible-chapter-copy
-      >
-        <svg
-          class="slide-action-icon"
-          aria-hidden="true"
-          viewBox="0 0 24 24"
+      <div class="hebrew-reader-actions">
+        <button
+          class="slide-action-button bible-chapter-copy-button"
+          type="button"
+          data-bible-chapter-copy
         >
-          <rect x="8" y="8" width="11" height="11" rx="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        <span>Копіювати розділ</span>
-      </button>
+          <svg
+            class="slide-action-icon"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Копіювати розділ</span>
+        </button>
+
+        <label class="hebrew-translation-toggle">
+          <input type="checkbox" checked data-translation-toggle />
+          <span>Український переклад</span>
+        </label>
+      </div>
     </header>
 
     <div class="bible-picker-sentinel" data-bible-picker-sentinel></div>
@@ -90,22 +97,31 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
       </button>
     </form>
 
-    <div
-      class="bible-chapter-text hebrew-chapter-text"
-      dir="rtl"
-      lang="he"
-      data-bible-chapter-text
-    >
+    <div class="hebrew-parallel-reader" data-bible-chapter-text>
+      <div class="hebrew-parallel-header" aria-hidden="true">
+        <span>Єврейський текст</span>
+        <span data-ukrainian-translation>Український переклад</span>
+      </div>
       {
         chapter.verses.map((verse) => (
-          <p
-            class="bible-verse hebrew-verse"
+          <div
+            class="bible-verse hebrew-parallel-verse"
             id={verse.number ? `v${verse.number}` : undefined}
             data-verse-number={verse.number}
           >
-            {verse.number && <sup>{verse.number}</sup>}
-            <span>{verse.text}</span>
-          </p>
+            <p class="hebrew-verse-text" dir="rtl" lang="he">
+              {verse.number && <sup>{verse.number}</sup>}
+              <span data-hebrew-text>{verse.text}</span>
+            </p>
+            <p
+              class="ukrainian-verse-text"
+              data-ukrainian-translation
+              lang="uk"
+            >
+              {verse.number && <sup>{verse.number}</sup>}
+              <span data-ukrainian-text>{verse.ukrainianText}</span>
+            </p>
+          </div>
         ))
       }
     </div>
@@ -169,6 +185,7 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     const bibleHeading = document.querySelector(".bible-reader-header h1");
     const bibleText = document.querySelector("[data-bible-chapter-text]");
     const chapterCopyButton = document.querySelector("[data-bible-chapter-copy]");
+    const translationToggle = document.querySelector("[data-translation-toggle]");
     const superscriptDigits = {
       0: "⁰",
       1: "¹",
@@ -237,6 +254,9 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
       navigateToSelectedChapter();
     });
     chapterSelect?.addEventListener("change", navigateToSelectedChapter);
+    translationToggle?.addEventListener("change", () => {
+      setTranslationVisibility(translationToggle.checked);
+    });
     window.addEventListener("scroll", updatePickerStickyState, { passive: true });
     window.addEventListener("resize", () => {
       updateStickyOffset();
@@ -248,6 +268,7 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     });
 
     renderChapters();
+    setTranslationVisibility(translationToggle?.checked ?? true);
     updateStickyOffset();
     updatePickerStickyState();
 
@@ -285,12 +306,29 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
       return `${citationTitle} ${chapterNumber}`.trim();
     };
 
+    const isTranslationVisible = () =>
+      !bibleReader?.classList.contains("is-translation-hidden");
+
     const getVerseClipboardText = (verse) => {
       const verseNumber = verse.dataset.verseNumber;
-      const verseText = verse.querySelector("span")?.textContent?.trim() ?? "";
+      const hebrewText =
+        verse.querySelector("[data-hebrew-text]")?.textContent?.trim() ??
+        verse.querySelector("span")?.textContent?.trim() ??
+        "";
+      const ukrainianText =
+        verse.querySelector("[data-ukrainian-text]")?.textContent?.trim() ?? "";
+      const reference = toSuperscript(verseNumber);
 
-      return `${toSuperscript(verseNumber)} ${verseText}`;
+      if (isTranslationVisible() && ukrainianText) {
+        return `${reference} ${hebrewText}\n${reference} ${ukrainianText}`;
+      }
+
+      return `${reference} ${hebrewText}`;
     };
+
+    function setTranslationVisibility(isVisible) {
+      bibleReader?.classList.toggle("is-translation-hidden", !isVisible);
+    }
 
     const getSelectedVerses = (selection) => {
       const verses = Array.from(bibleText.querySelectorAll("[data-verse-number]"));

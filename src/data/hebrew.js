@@ -1,4 +1,5 @@
 import hebrewBibleSource from "./hebrew.json";
+import { bibleChapters } from "./bible.js";
 
 const hebrewBookInfo = [
   ["Genesis", "gen", "Буття"],
@@ -48,12 +49,20 @@ const getHebrewWord = (token) => {
   return String(value ?? "").replaceAll("/", "");
 };
 
+const ukrainianChaptersByKey = new Map(
+  bibleChapters.map((chapter) => [`${chapter.slug}:${chapter.chapter}`, chapter]),
+);
+
+const getUkrainianVerseText = (chapter, verseNumber) =>
+  chapter?.verses.find((verse) => verse.number === verseNumber)?.text ?? "";
+
 const allChapters = hebrewBookInfo.flatMap(
   ([sourceTitle, slug, title], bookIndex) => {
     const chapters = hebrewBibleSource[sourceTitle] ?? [];
 
     return chapters.map((verses, chapterIndex) => {
       const chapter = chapterIndex + 1;
+      const ukrainianChapter = ukrainianChaptersByKey.get(`${slug}:${chapter}`);
 
       return {
         number: bookIndex + 1,
@@ -65,6 +74,7 @@ const allChapters = hebrewBookInfo.flatMap(
         verses: verses.map((tokens, verseIndex) => ({
           number: verseIndex + 1,
           text: tokens.map(getHebrewWord).join(" "),
+          ukrainianText: getUkrainianVerseText(ukrainianChapter, verseIndex + 1),
         })),
       };
     });
