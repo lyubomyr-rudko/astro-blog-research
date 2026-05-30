@@ -1,0 +1,461 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import {
+  getAdjacentHebrewBibleChapters,
+  hebrewBibleBooks,
+  hebrewBibleChapters,
+} from "../../../data/hebrew.js";
+
+export const getStaticPaths = () =>
+  hebrewBibleChapters.map((chapter) => ({
+    params: {
+      book: chapter.slug,
+      chapter: String(chapter.chapter),
+    },
+    props: {
+      chapter,
+    },
+  }));
+
+const { chapter } = Astro.props;
+const { previousChapter, nextChapter } =
+  getAdjacentHebrewBibleChapters(chapter);
+const currentBook = hebrewBibleBooks.find((book) => book.slug === chapter.slug);
+const baseUrl = import.meta.env.BASE_URL.endsWith("/")
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
+---
+
+<BaseLayout
+  title={`${chapter.title} ${chapter.chapter} | Єврейська Біблія`}
+  description={`Читайте ${chapter.title}, розділ ${chapter.chapter}, єврейською мовою.`}
+>
+  <article
+    class="blog-post-card bible-reader hebrew-bible-reader"
+    data-bible-reader
+    data-book-title={chapter.title}
+    data-chapter-number={chapter.chapter}
+  >
+    <header class="post-header bible-reader-header">
+      <p class="post-eyebrow">Єврейська Біблія</p>
+      <h1>{chapter.title} {chapter.chapter}</h1>
+      <div class="hebrew-reader-actions">
+        <button
+          class="slide-action-button bible-chapter-copy-button"
+          type="button"
+          data-bible-chapter-copy
+        >
+          <svg
+            class="slide-action-icon"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>Копіювати розділ</span>
+        </button>
+
+        <label class="hebrew-translation-toggle">
+          <input type="checkbox" checked data-translation-toggle />
+          <span>Український переклад</span>
+        </label>
+      </div>
+    </header>
+
+    <div class="bible-picker-sentinel" data-bible-picker-sentinel></div>
+    <form class="bible-picker bible-reader-picker bible-sticky-picker" data-bible-picker>
+      <label class="bible-picker-field">
+        <span>Книга</span>
+        <select name="book" aria-label="Книга">
+          {
+            hebrewBibleBooks.map((book) => (
+              <option
+                value={book.slug}
+                data-chapters={book.chapters.join(",")}
+                selected={book.slug === chapter.slug}
+              >
+                {book.title}
+              </option>
+            ))
+          }
+        </select>
+      </label>
+
+      <label class="bible-picker-field">
+        <span>Розділ</span>
+        <select
+          name="chapter"
+          data-current-chapter={chapter.chapter}
+          aria-label="Розділ"
+        ></select>
+      </label>
+
+      <button class="button-secondary bible-picker-button" type="submit">
+        Перейти
+      </button>
+    </form>
+
+    <div class="hebrew-parallel-reader" data-bible-chapter-text>
+      <div class="hebrew-parallel-header" aria-hidden="true">
+        <span>Єврейський текст</span>
+        <span data-ukrainian-translation>Український переклад</span>
+      </div>
+      {
+        chapter.verses.map((verse) => (
+          <div
+            class="bible-verse hebrew-parallel-verse"
+            id={verse.number ? `v${verse.number}` : undefined}
+            data-verse-number={verse.number}
+          >
+            <p class="hebrew-verse-text" dir="rtl" lang="he">
+              {verse.number && <sup>{verse.number}</sup>}
+              <span data-hebrew-text>{verse.text}</span>
+            </p>
+            <p
+              class="ukrainian-verse-text"
+              data-ukrainian-translation
+              lang="uk"
+            >
+              {verse.number && <sup>{verse.number}</sup>}
+              <span data-ukrainian-text>{verse.ukrainianText}</span>
+            </p>
+          </div>
+        ))
+      }
+    </div>
+
+    <nav class="sermon-pagination bible-pagination" aria-label="Навігація розділами">
+      {
+        previousChapter ? (
+          <a class="sermon-pagination-link" href={withBase(previousChapter.path)}>
+            <span class="sermon-pagination-label">Попередній розділ</span>
+            <span class="sermon-pagination-title">
+              {previousChapter.title} {previousChapter.chapter}
+            </span>
+          </a>
+        ) : (
+          <span></span>
+        )
+      }
+
+      {
+        nextChapter ? (
+          <a class="sermon-pagination-link is-next" href={withBase(nextChapter.path)}>
+            <span class="sermon-pagination-label">Наступний розділ</span>
+            <span class="sermon-pagination-title">
+              {nextChapter.title} {nextChapter.chapter}
+            </span>
+          </a>
+        ) : (
+          <span></span>
+        )
+      }
+    </nav>
+
+    {
+      currentBook && (
+        <section class="bible-chapter-list" aria-label={`Інші розділи книги ${currentBook.title}`}>
+          <h2>Розділи книги {currentBook.title}</h2>
+          <ol>
+            {currentBook.chapters.map((bookChapter) => (
+              <li>
+                <a
+                  class={bookChapter === chapter.chapter ? "is-active" : undefined}
+                  href={withBase(`/hebrew-bible/${currentBook.slug}/${bookChapter}/`)}
+                >
+                  {bookChapter}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )
+    }
+  </article>
+
+  <script define:vars={{ baseUrl }}>
+    const form = document.querySelector("[data-bible-picker]");
+    const bookSelect = form?.elements.book;
+    const chapterSelect = form?.elements.chapter;
+    const pickerSentinel = document.querySelector("[data-bible-picker-sentinel]");
+    const siteHeader = document.querySelector(".site-header");
+    const bibleReader = document.querySelector("[data-bible-reader]");
+    const bibleHeading = document.querySelector(".bible-reader-header h1");
+    const bibleText = document.querySelector("[data-bible-chapter-text]");
+    const chapterCopyButton = document.querySelector("[data-bible-chapter-copy]");
+    const translationToggle = document.querySelector("[data-translation-toggle]");
+    const superscriptDigits = {
+      0: "⁰",
+      1: "¹",
+      2: "²",
+      3: "³",
+      4: "⁴",
+      5: "⁵",
+      6: "⁶",
+      7: "⁷",
+      8: "⁸",
+      9: "⁹",
+    };
+
+    const updateStickyOffset = () => {
+      const headerHeight = siteHeader?.getBoundingClientRect().height ?? 0;
+      document.documentElement.style.setProperty(
+        "--bible-picker-sticky-top",
+        `${headerHeight + 12}px`,
+      );
+    };
+
+    const updatePickerStickyState = () => {
+      if (!form || !pickerSentinel) {
+        return;
+      }
+
+      const stickyTop =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue(
+            "--bible-picker-sticky-top",
+          ),
+        ) || 0;
+      const isStuck = pickerSentinel.getBoundingClientRect().top <= stickyTop;
+
+      form.classList.toggle("is-stuck", isStuck);
+    };
+
+    const renderChapters = () => {
+      const selectedBook = bookSelect.selectedOptions[0];
+      const chapters = selectedBook.dataset.chapters.split(",");
+      const currentChapter = chapterSelect.dataset.currentChapter;
+
+      chapterSelect.replaceChildren(
+        ...chapters.map((chapter) => {
+          const option = document.createElement("option");
+          option.value = chapter;
+          option.textContent = chapter;
+          option.selected = chapter === currentChapter;
+          return option;
+        }),
+      );
+    };
+
+    const navigateToSelectedChapter = () => {
+      window.location.href = `${baseUrl}hebrew-bible/${bookSelect.value}/${chapterSelect.value}/`;
+    };
+
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      navigateToSelectedChapter();
+    });
+
+    bookSelect?.addEventListener("change", () => {
+      chapterSelect.dataset.currentChapter = "1";
+      renderChapters();
+      navigateToSelectedChapter();
+    });
+    chapterSelect?.addEventListener("change", navigateToSelectedChapter);
+    translationToggle?.addEventListener("change", () => {
+      setTranslationVisibility(translationToggle.checked);
+    });
+    window.addEventListener("scroll", updatePickerStickyState, { passive: true });
+    window.addEventListener("resize", () => {
+      updateStickyOffset();
+      updatePickerStickyState();
+    });
+    window.addEventListener("load", () => {
+      updateStickyOffset();
+      updatePickerStickyState();
+    });
+
+    renderChapters();
+    setTranslationVisibility(translationToggle?.checked ?? true);
+    updateStickyOffset();
+    updatePickerStickyState();
+
+    const toSuperscript = (value) =>
+      String(value).replace(/\d/g, (digit) => superscriptDigits[digit]);
+
+    const writeToClipboard = async (text) => {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.top = "-1000px";
+      document.body.append(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    };
+
+    const getChapterReference = () => {
+      const headingBookTitle =
+        bibleHeading?.textContent?.replace(/\s+\d+\s*$/, "").trim() ?? "";
+      const selectedBookTitle =
+        bookSelect?.selectedOptions[0]?.textContent?.trim() ?? "";
+      const citationTitle =
+        bibleReader?.dataset.bookTitle ||
+        headingBookTitle ||
+        selectedBookTitle;
+      const chapterNumber = bibleReader?.dataset.chapterNumber ?? "";
+
+      return `${citationTitle} ${chapterNumber}`.trim();
+    };
+
+    const isTranslationVisible = () =>
+      !bibleReader?.classList.contains("is-translation-hidden");
+
+    const getVerseClipboardText = (verse) => {
+      const verseNumber = verse.dataset.verseNumber;
+      const hebrewText =
+        verse.querySelector("[data-hebrew-text]")?.textContent?.trim() ??
+        verse.querySelector("span")?.textContent?.trim() ??
+        "";
+      const ukrainianText =
+        verse.querySelector("[data-ukrainian-text]")?.textContent?.trim() ?? "";
+      const reference = toSuperscript(verseNumber);
+
+      if (isTranslationVisible() && ukrainianText) {
+        return `${reference} ${hebrewText}\n${reference} ${ukrainianText}`;
+      }
+
+      return `${reference} ${hebrewText}`;
+    };
+
+    function setTranslationVisibility(isVisible) {
+      bibleReader?.classList.toggle("is-translation-hidden", !isVisible);
+    }
+
+    const getSelectedVerses = (selection) => {
+      const verses = Array.from(bibleText.querySelectorAll("[data-verse-number]"));
+
+      return verses.filter((verse) => {
+        for (let index = 0; index < selection.rangeCount; index += 1) {
+          if (selection.getRangeAt(index).intersectsNode(verse)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+    };
+
+    const getReference = (verses) => {
+      const verseNumbers = verses
+        .map((verse) => Number(verse.dataset.verseNumber))
+        .filter(Boolean);
+      const firstVerse = verseNumbers[0];
+      const lastVerse = verseNumbers.at(-1);
+      const verseRange = firstVerse === lastVerse ? firstVerse : `${firstVerse}-${lastVerse}`;
+
+      return `${getChapterReference()}:${verseRange}`;
+    };
+
+    const setActiveVerse = (verseId) => {
+      bibleText
+        ?.querySelectorAll(".bible-verse.is-active")
+        .forEach((verse) => verse.classList.remove("is-active"));
+
+      if (!verseId) {
+        return null;
+      }
+
+      const verse = document.getElementById(verseId);
+
+      if (verse?.matches(".bible-verse")) {
+        verse.classList.add("is-active");
+        return verse;
+      }
+
+      return null;
+    };
+
+    const scrollToHashVerse = () => {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+
+      if (!hash) {
+        setActiveVerse(null);
+        return;
+      }
+
+      const verse = setActiveVerse(hash);
+
+      if (verse) {
+        verse.scrollIntoView({ block: "start" });
+      }
+    };
+
+    bibleText?.addEventListener("click", (event) => {
+      const target =
+        event.target instanceof Element ? event.target : event.target?.parentElement;
+      const verse = target?.closest(".bible-verse");
+
+      if (!verse?.id) {
+        return;
+      }
+
+      window.history.replaceState(null, "", `#${verse.id}`);
+      setActiveVerse(verse.id);
+    });
+
+    window.addEventListener("hashchange", scrollToHashVerse);
+    window.addEventListener("load", scrollToHashVerse);
+    scrollToHashVerse();
+
+    document.addEventListener("copy", (event) => {
+      const selection = window.getSelection();
+
+      if (!selection || selection.isCollapsed || !bibleText) {
+        return;
+      }
+
+      const selectedVerses = getSelectedVerses(selection);
+
+      if (selectedVerses.length === 0) {
+        return;
+      }
+
+      const copiedText = selectedVerses
+        .map(getVerseClipboardText)
+        .join("\n");
+
+      event.preventDefault();
+      if (!event.clipboardData) {
+        return;
+      }
+
+      event.clipboardData.setData(
+        "text/plain",
+        `${copiedText}\n${getReference(selectedVerses)}`,
+      );
+    });
+
+    chapterCopyButton?.addEventListener("click", async () => {
+      if (!bibleText) return;
+
+      const chapterText = Array.from(
+        bibleText.querySelectorAll("[data-verse-number]"),
+      )
+        .map(getVerseClipboardText)
+        .join("\n");
+
+      if (!chapterText) return;
+
+      const buttonLabel = chapterCopyButton.querySelector("span");
+
+      await writeToClipboard(`${chapterText}\n${getChapterReference()}`);
+
+      if (buttonLabel) buttonLabel.textContent = "Скопійовано";
+      chapterCopyButton.classList.add("is-copied");
+
+      window.setTimeout(() => {
+        if (buttonLabel) buttonLabel.textContent = "Копіювати розділ";
+        chapterCopyButton.classList.remove("is-copied");
+      }, 1400);
+    });
+  </script>
+</BaseLayout>

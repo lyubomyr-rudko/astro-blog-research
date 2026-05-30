@@ -113,7 +113,12 @@ const structuredData = {
           </a>
           <a
             href={withBase("/bible/")}
-            class={currentRoute.startsWith("/bible/") ? "is-active" : undefined}
+            class={
+              currentRoute.startsWith("/bible/") ||
+              currentRoute.startsWith("/hebrew-bible/")
+                ? "is-active"
+                : undefined
+            }
           >
             Біблія
           </a>
