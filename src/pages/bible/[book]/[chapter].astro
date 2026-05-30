@@ -5,6 +5,7 @@ import {
   bibleChapters,
   getAdjacentBibleChapters,
 } from "../../../data/bible.js";
+import { hebrewBibleChapters } from "../../../data/hebrew.js";
 
 export const getStaticPaths = () =>
   bibleChapters.map((chapter) => ({
@@ -20,6 +21,11 @@ export const getStaticPaths = () =>
 const { chapter } = Astro.props;
 const { previousChapter, nextChapter } = getAdjacentBibleChapters(chapter);
 const currentBook = bibleBooks.find((book) => book.slug === chapter.slug);
+const hebrewChapter = hebrewBibleChapters.find(
+  (hebrewBibleChapter) =>
+    hebrewBibleChapter.slug === chapter.slug &&
+    hebrewBibleChapter.chapter === chapter.chapter,
+);
 const baseUrl = import.meta.env.BASE_URL.endsWith("/")
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
@@ -40,25 +46,45 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     <header class="post-header bible-reader-header">
       <p class="post-eyebrow">Українська Біблія Івана Огієнка</p>
       <h1>{chapter.title} {chapter.chapter}</h1>
-      <button
-        class="slide-action-button bible-chapter-copy-button"
-        type="button"
-        data-bible-chapter-copy
-      >
-        <svg
-          class="slide-action-icon"
-          aria-hidden="true"
-          viewBox="0 0 24 24"
+      <div class="bible-reader-actions">
+        <button
+          class="slide-action-button bible-chapter-copy-button"
+          type="button"
+          data-bible-chapter-copy
         >
-          <rect x="8" y="8" width="11" height="11" rx="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        <span>Копіювати розділ</span>
-      </button>
+          <svg class="slide-action-icon" aria-hidden="true" viewBox="0 0 24 24">
+            <rect x="8" y="8" width="11" height="11" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"
+            ></path>
+          </svg>
+          <span>Копіювати розділ</span>
+        </button>
+
+        {
+          hebrewChapter && (
+            <a class="slide-action-button" href={withBase(hebrewChapter.path)}>
+              <svg
+                class="slide-action-icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" />
+                <path d="M8 7h8" />
+                <path d="M8 11h6" />
+              </svg>
+              <span>Читати оригінал на івриті</span>
+            </a>
+          )
+        }
+      </div>
     </header>
 
     <div class="bible-picker-sentinel" data-bible-picker-sentinel></div>
-    <form class="bible-picker bible-reader-picker bible-sticky-picker" data-bible-picker>
+    <form
+      class="bible-picker bible-reader-picker bible-sticky-picker"
+      data-bible-picker
+    >
       <label class="bible-picker-field">
         <span>Книга</span>
         <select name="book" aria-label="Книга">
@@ -81,8 +107,7 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
         <select
           name="chapter"
           data-current-chapter={chapter.chapter}
-          aria-label="Розділ"
-        ></select>
+          aria-label="Розділ"></select>
       </label>
 
       <button class="button-secondary bible-picker-button" type="submit">
@@ -105,43 +130,57 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
       }
     </div>
 
-    <nav class="sermon-pagination bible-pagination" aria-label="Навігація розділами">
+    <nav
+      class="sermon-pagination bible-pagination"
+      aria-label="Навігація розділами"
+    >
       {
         previousChapter ? (
-          <a class="sermon-pagination-link" href={withBase(previousChapter.path)}>
+          <a
+            class="sermon-pagination-link"
+            href={withBase(previousChapter.path)}
+          >
             <span class="sermon-pagination-label">Попередній розділ</span>
             <span class="sermon-pagination-title">
               {previousChapter.title} {previousChapter.chapter}
             </span>
           </a>
         ) : (
-          <span></span>
+          <span />
         )
       }
 
       {
         nextChapter ? (
-          <a class="sermon-pagination-link is-next" href={withBase(nextChapter.path)}>
+          <a
+            class="sermon-pagination-link is-next"
+            href={withBase(nextChapter.path)}
+          >
             <span class="sermon-pagination-label">Наступний розділ</span>
             <span class="sermon-pagination-title">
               {nextChapter.title} {nextChapter.chapter}
             </span>
           </a>
         ) : (
-          <span></span>
+          <span />
         )
       }
     </nav>
 
     {
       currentBook && (
-        <section class="bible-chapter-list" aria-label={`Інші розділи книги ${currentBook.title}`}>
+        <section
+          class="bible-chapter-list"
+          aria-label={`Інші розділи книги ${currentBook.title}`}
+        >
           <h2>Розділи книги {currentBook.title}</h2>
           <ol>
             {currentBook.chapters.map((bookChapter) => (
               <li>
                 <a
-                  class={bookChapter === chapter.chapter ? "is-active" : undefined}
+                  class={
+                    bookChapter === chapter.chapter ? "is-active" : undefined
+                  }
                   href={withBase(`/bible/${currentBook.slug}/${bookChapter}/`)}
                 >
                   {bookChapter}
@@ -158,12 +197,16 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     const form = document.querySelector("[data-bible-picker]");
     const bookSelect = form?.elements.book;
     const chapterSelect = form?.elements.chapter;
-    const pickerSentinel = document.querySelector("[data-bible-picker-sentinel]");
+    const pickerSentinel = document.querySelector(
+      "[data-bible-picker-sentinel]",
+    );
     const siteHeader = document.querySelector(".site-header");
     const bibleReader = document.querySelector("[data-bible-reader]");
     const bibleHeading = document.querySelector(".bible-reader-header h1");
     const bibleText = document.querySelector("[data-bible-chapter-text]");
-    const chapterCopyButton = document.querySelector("[data-bible-chapter-copy]");
+    const chapterCopyButton = document.querySelector(
+      "[data-bible-chapter-copy]",
+    );
     const superscriptDigits = {
       0: "⁰",
       1: "¹",
@@ -232,7 +275,9 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
       navigateToSelectedChapter();
     });
     chapterSelect?.addEventListener("change", navigateToSelectedChapter);
-    window.addEventListener("scroll", updatePickerStickyState, { passive: true });
+    window.addEventListener("scroll", updatePickerStickyState, {
+      passive: true,
+    });
     window.addEventListener("resize", () => {
       updateStickyOffset();
       updatePickerStickyState();
@@ -289,7 +334,9 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
     };
 
     const getSelectedVerses = (selection) => {
-      const verses = Array.from(bibleText.querySelectorAll("[data-verse-number]"));
+      const verses = Array.from(
+        bibleText.querySelectorAll("[data-verse-number]"),
+      );
 
       return verses.filter((verse) => {
         for (let index = 0; index < selection.rangeCount; index += 1) {
@@ -308,7 +355,8 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
         .filter(Boolean);
       const firstVerse = verseNumbers[0];
       const lastVerse = verseNumbers.at(-1);
-      const verseRange = firstVerse === lastVerse ? firstVerse : `${firstVerse}-${lastVerse}`;
+      const verseRange =
+        firstVerse === lastVerse ? firstVerse : `${firstVerse}-${lastVerse}`;
 
       return `${getChapterReference()}:${verseRange}`;
     };
@@ -349,7 +397,9 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
 
     bibleText?.addEventListener("click", (event) => {
       const target =
-        event.target instanceof Element ? event.target : event.target?.parentElement;
+        event.target instanceof Element
+          ? event.target
+          : event.target?.parentElement;
       const verse = target?.closest(".bible-verse");
 
       if (!verse?.id) {
@@ -377,9 +427,7 @@ const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
         return;
       }
 
-      const copiedText = selectedVerses
-        .map(getVerseClipboardText)
-        .join("\n");
+      const copiedText = selectedVerses.map(getVerseClipboardText).join("\n");
 
       event.preventDefault();
       if (!event.clipboardData) {

@@ -1016,6 +1016,18 @@ img {
   margin-top: 1rem;
 }
 
+.bible-reader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.bible-reader-actions .bible-chapter-copy-button {
+  margin-top: 0;
+}
+
 .hebrew-reader-actions {
   display: flex;
   flex-wrap: wrap;
