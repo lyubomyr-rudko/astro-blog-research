@@ -1,6 +1,7 @@
 import { getCollection } from "astro:content";
 import { bibleChapters } from "../data/bible.js";
 import { hebrewBibleChapters } from "../data/hebrew.js";
+import { getUpcomingWorshipService } from "../data/upcomingWorshipService";
 
 const staticPages = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
@@ -55,6 +56,7 @@ ${lastmod ? `    <lastmod>${lastmod}</lastmod>\n` : ""}${
 export async function GET({ site }: { site: URL }) {
   const today = new Date().toISOString().slice(0, 10);
   const posts = await getCollection("blog");
+  const upcomingService = getUpcomingWorshipService();
   const siteUrl = site ?? new URL("https://wesley.org.ua");
 
   const urls = [
@@ -68,6 +70,12 @@ export async function GET({ site }: { site: URL }) {
       changefreq: post.id.startsWith("church-in-lviv/") ? "weekly" : "monthly",
       priority: post.id.startsWith("sermons/") ? "0.7" : "0.6",
     })),
+    {
+      path: upcomingService.path,
+      lastmod: upcomingService.data.pubDate,
+      changefreq: "weekly",
+      priority: "0.7",
+    },
     ...bibleChapters.map((chapter) => ({
       path: chapter.path,
       lastmod: today,
