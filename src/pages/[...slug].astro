@@ -3,22 +3,77 @@ import { getCollection, render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
 import type { GetStaticPaths } from "astro";
 import BlogPostLayout from "../layouts/BlogPostLayout.astro";
+import {
+  getUpcomingWorshipService,
+  type UpcomingWorshipService,
+} from "../data/upcomingWorshipService";
 
 type BlogPostEntry = CollectionEntry<"blog">;
 
 export const getStaticPaths = (async () => {
   const posts = await getCollection("blog");
+  const upcomingService = getUpcomingWorshipService();
+  const archivedPosts = posts.filter((post) => post.id !== upcomingService.id);
 
-  return posts.map((post: BlogPostEntry) => ({
-    params: { slug: post.id },
-    props: { post },
-  }));
+  return [
+    {
+      params: { slug: upcomingService.id },
+      props: { upcomingService },
+    },
+    ...archivedPosts.map((post: BlogPostEntry) => ({
+      params: { slug: post.id },
+      props: { post },
+    })),
+  ];
 }) satisfies GetStaticPaths;
 
-const { post } = Astro.props as { post: BlogPostEntry };
-const { Content } = await render(post);
+const { post, upcomingService } = Astro.props as {
+  post?: BlogPostEntry;
+  upcomingService?: UpcomingWorshipService;
+};
+
+let Content: Awaited<ReturnType<typeof render<"blog">>>["Content"] | undefined;
+
+if (post) {
+  const renderedPost = await render(post);
+  Content = renderedPost.Content;
+}
 ---
 
-<BlogPostLayout frontmatter={post.data} slug={post.id}>
-  <Content />
-</BlogPostLayout>
+{
+  post && Content ? (
+    <BlogPostLayout frontmatter={post.data} slug={post.id}>
+      <Content />
+    </BlogPostLayout>
+  ) : upcomingService ? (
+    <BlogPostLayout frontmatter={upcomingService.data} slug={upcomingService.id}>
+      <h1>{upcomingService.data.title}</h1>
+
+      <p>
+        Запрошуємо на богослужіння церкви у Львові, яке відбудеться{" "}
+        {upcomingService.dateDisplay} о <strong>{upcomingService.time}</strong>.
+        Приєднуйтесь до спільного поклоніння, молитви та вивчення Божого слова.
+      </p>
+
+      <p>
+        <strong>Адреса:</strong>{" "}
+        {upcomingService.address}
+      </p>
+
+      <h2>Слайди пісень</h2>
+
+      <iframe
+        style="width:100%; aspect-ratio:16/9; min-height:520px; border:0;"
+        data-base-src={`../../slides/#group=${upcomingService.slideGroup}`}
+        title="Слайди пісень для богослужіння"
+        allowfullscreen
+      />
+
+      <p>
+        <a href={`../../slides/#group=${upcomingService.slideGroup}`}>
+          Відкрити слайди пісень окремо
+        </a>
+      </p>
+    </BlogPostLayout>
+  ) : null
+}

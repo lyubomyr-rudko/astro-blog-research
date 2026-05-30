@@ -2,14 +2,17 @@
 import { getCollection } from "astro:content";
 import type { CollectionEntry } from "astro:content";
 import BaseLayout from "../layouts/BaseLayout.astro";
+import { getUpcomingWorshipService } from "../data/upcomingWorshipService";
 
 const baseUrl = import.meta.env.BASE_URL.endsWith("/")
   ? import.meta.env.BASE_URL
   : `${import.meta.env.BASE_URL}/`;
 const withBase = (path) => `${baseUrl}${path.replace(/^\/+/, "")}`;
 
+const upcomingService = getUpcomingWorshipService();
 const churchServices = (await getCollection("blog"))
   .filter((post) => post.id.startsWith("church-in-lviv/"))
+  .filter((post) => post.id !== upcomingService.id)
   .sort((a, b) => (b.data.pubDate ?? "").localeCompare(a.data.pubDate ?? ""));
 type ChurchServiceEntry = CollectionEntry<"blog">;
 ---
@@ -23,10 +26,18 @@ type ChurchServiceEntry = CollectionEntry<"blog">;
       <p class="resource-kicker">Записи богослужінь</p>
       <h1 class="resource-title">Сторінка Церкви св. Івана м. Львів</h1>
       <div class="resource-summary">
-        <h2 class="church-address">Завітайте до нас у неділю <strong> 11:00</strong><br/> м. Львів, площа Григоренка 5</h2>
+        <h2 class="church-address">
+          Завітайте до нас у неділю, {upcomingService.dateDisplay}
+          <strong>{upcomingService.time}</strong><br />
+          {upcomingService.address}
+        </h2>
         Архів записів богослужінь церкви у Львові, впорядкований від найновіших до
-        давніших.
+        давніших. Найближче богослужіння завжди показується першим за датою
+        наступної неділі.
         <div class="church-actions">
+          <a class="button-primary" href={withBase(upcomingService.path)}>
+            Найближче богослужіння
+          </a>
           <a class="button-secondary" href={withBase("/slides/")}>
             Церковний Пісенник
           </a>
@@ -39,14 +50,26 @@ type ChurchServiceEntry = CollectionEntry<"blog">;
         <p class="archive-eyebrow">Повний перелік</p>
         <h2>Служіння церкви у Львові</h2>
         <p class="archive-summary">
-          У списку зараз: <span class="count">{churchServices.length}</span>{
+          У списку зараз: <span class="count">{churchServices.length + 1}</span>{
             " "
           }
-          записів
+          сторінок, включно з найближчим богослужінням
         </p>
       </div>
 
       <ol class="sermon-list">
+        <li class="sermon-item is-upcoming">
+          <div class="sermon-meta">
+            <span class="sermon-year">Найближче богослужіння</span>
+            <span class="sermon-original">Дата: {upcomingService.data.pubDate}</span>
+          </div>
+          <h4 class="sermon-title">
+            <a class="sermon-link" href={withBase(upcomingService.path)}>
+              {upcomingService.data.title}
+            </a>
+          </h4>
+          <p class="archive-summary">{upcomingService.data.description}</p>
+        </li>
         {
           churchServices.map((service: ChurchServiceEntry) => (
             <li class="sermon-item">
